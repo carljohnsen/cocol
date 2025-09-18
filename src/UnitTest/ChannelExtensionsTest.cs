@@ -8,6 +8,28 @@ namespace UnitTest
     [TestClass]
     public class ChannelExtensionsTest
     {
+        bool anyUnobservedExceptions = false;
+
+        [TestInitialize]
+        public void Setup()
+        {
+            anyUnobservedExceptions = false;
+            TaskScheduler.UnobservedTaskException += (s, e) =>
+            {
+                anyUnobservedExceptions = true;
+                e.SetObserved();
+            };
+        }
+
+        [TestCleanup]
+        public void Cleanup()
+        {
+            // Force finalizers to run
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            Assert.IsFalse(anyUnobservedExceptions, "Unobserved exception should have been caught.");
+        }
+
         [TestMethod]
         public void TestWaitForTaskOrThrow_propagatesStackTrace()
         {
@@ -152,6 +174,20 @@ namespace UnitTest
             var tryReadResult2 = await channel.TryReadAsync(TimeSpan.FromSeconds(1), cts.Token);
             Assert.IsTrue(tryReadResult2.Key, "Expected TryRead to succeed with non-triggering timeout");
             Assert.AreEqual(4, tryReadResult2.Value);
+        }
+
+        [TestMethod]
+        public async Task TestThatUnobservedExceptionIsCaughtOnTryReadAsync()
+        {
+            var channel = ChannelManager.CreateChannel<int>();
+            await channel.TryReadAsync().ConfigureAwait(false);
+        }
+
+        [TestMethod]
+        public async Task TestThatUnobservedExceptionIsCaughtOnTryWriteAsync()
+        {
+            var channel = ChannelManager.CreateChannel<int>();
+            await channel.TryWriteAsync(1).ConfigureAwait(false);
         }
 
         private void ThrowingMethod()
