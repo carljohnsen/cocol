@@ -206,7 +206,24 @@ namespace CoCoL
 		/// <returns>True if the write succeeded, false otherwise</returns>
 		public static Task<bool> TryWriteAsync<T>(this IWriteChannel<T> self, T value, TimeSpan waittime)
 		{
-			return self.WriteAsync(value, new TimeoutOffer(waittime)).ContinueWith(x => x.IsCompleted);
+			return self.WriteAsync(value, new TimeoutOffer(waittime)).ContinueWith(x =>
+			{
+				if (x.IsFaulted || x.IsCanceled)
+				{
+					Exception ex = x.Exception;
+					if (ex is AggregateException aex && aex.InnerExceptions.Count == 1)
+						ex = aex.InnerExceptions[0];
+
+					return ex switch
+					{
+						// Consume timeout exceptions
+						TimeoutException _ => false,
+						_ => throw ex,
+					};
+				}
+
+				return x.IsCompleted;
+			});
 		}
 
 		/// <summary>
@@ -258,7 +275,18 @@ namespace CoCoL
 			return self.ReadAsync(new TimeoutOffer(waittime)).ContinueWith(x =>
 			{
 				if (x.IsFaulted || x.IsCanceled)
-					return new KeyValuePair<bool, T>(false, default(T));
+				{
+					Exception ex = x.Exception;
+					if (ex is AggregateException aex && aex.InnerExceptions.Count == 1)
+						ex = aex.InnerExceptions[0];
+
+					return ex switch
+					{
+						// Consume timeout exceptions
+						TimeoutException _ => new KeyValuePair<bool, T>(false, default(T)),
+						_ => throw ex,
+					};
+				}
 
 				return new KeyValuePair<bool, T>(true, x.Result);
 			});
