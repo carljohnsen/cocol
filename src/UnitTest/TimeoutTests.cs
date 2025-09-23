@@ -17,6 +17,10 @@ namespace UnitTest
 		[TestInitialize]
 		public void Setup()
 		{
+			// Force finalizers to run
+			GC.Collect();
+			GC.WaitForPendingFinalizers();
+
 			// Clean up any previous handlers
 			anyUnobservedExceptions = false;
 			TaskScheduler.UnobservedTaskException += (s, e) =>
