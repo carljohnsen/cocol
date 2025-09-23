@@ -452,7 +452,7 @@ namespace CoCoL
 			}
 			else if (res.IsCanceled)
 			{
-				throw new OperationCanceledException();
+				throw new TaskCanceledException();
 			}
 		}
 
@@ -476,7 +476,7 @@ namespace CoCoL
 			}
 			else if (res.IsCanceled)
 			{
-				throw new OperationCanceledException();
+				throw new TaskCanceledException();
 			}
 		}
 
@@ -969,7 +969,7 @@ namespace CoCoL
 			}
 			else if (res.IsCanceled)
 			{
-				throw new OperationCanceledException();
+				throw new TaskCanceledException();
 			}
 		}
 
