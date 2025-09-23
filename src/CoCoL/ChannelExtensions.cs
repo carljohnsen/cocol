@@ -314,7 +314,7 @@ namespace CoCoL
 						ex = aex.InnerExceptions[0];
 
 					// Check if it's the token that requested the cancellation
-					if (x.IsCanceled)
+					if (x.IsCanceled && cancelToken.IsCancellationRequested)
 						throw new TaskCanceledException();
 					// Otherwise, it's the timeout, which is caught by the null in the switch
 
