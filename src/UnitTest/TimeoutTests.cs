@@ -4,6 +4,7 @@ using CoCoL;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Threading;
 
 #nullable enable
 
@@ -93,22 +94,26 @@ namespace UnitTest
 			var c3 = ChannelManager.CreateChannel<int>();
 			var c4 = ChannelManager.CreateChannel<int>();
 			Task? r1 = null, r2 = null, r3 = null, r4 = null;
+			var token = new CancellationTokenSource();
 
 			async Task ObservePotentialExceptions()
 			{
+				token.Cancel();
 				// Observe the exceptions on the other tasks
 				if (r1 != null) try { await r1; } catch { }
 				if (r2 != null) try { await r2; } catch { }
 				if (r3 != null) try { await r3; } catch { }
 				if (r4 != null) try { await r4; } catch { }
+				token.Dispose();
+				token = new CancellationTokenSource();
 			}
 
 			async Task p()
 			{
-				r1 = c1.ReadAsync(TimeSpan.FromSeconds(5));
-				r2 = c2.ReadAsync(TimeSpan.FromSeconds(4));
-				r3 = c3.ReadAsync(TimeSpan.FromSeconds(2));
-				r4 = c4.ReadAsync(TimeSpan.FromSeconds(4));
+				r1 = c1.ReadAsync(TimeSpan.FromSeconds(5), token.Token);
+				r2 = c2.ReadAsync(TimeSpan.FromSeconds(4), token.Token);
+				r3 = c3.ReadAsync(TimeSpan.FromSeconds(2), token.Token);
+				r4 = c4.ReadAsync(TimeSpan.FromSeconds(4), token.Token);
 				try
 				{
 					var t = await Task.WhenAny(
@@ -131,6 +136,7 @@ namespace UnitTest
 				throw new UnittestException("Failed to get timeout");
 			await ObservePotentialExceptions();
 
+			token.Dispose();
 		}
 
 		[TestMethod]
@@ -141,22 +147,26 @@ namespace UnitTest
 			var c3 = ChannelManager.CreateChannel<int>();
 			var c4 = ChannelManager.CreateChannel<int>();
 			Task? r1 = null, r2 = null, r3 = null, r4 = null;
+			var token = new CancellationTokenSource();
 
 			async Task ObservePotentialExceptions()
 			{
+				token.Cancel();
 				// Observe the exceptions on the other tasks
 				if (r1 != null) try { await r1; } catch { }
 				if (r2 != null) try { await r2; } catch { }
 				if (r3 != null) try { await r3; } catch { }
 				if (r4 != null) try { await r4; } catch { }
+				token.Dispose();
+				token = new CancellationTokenSource();
 			}
 
 			async Task p()
 			{
-				r1 = c1.ReadAsync(TimeSpan.FromSeconds(7));
-				r2 = c2.ReadAsync(TimeSpan.FromSeconds(3));
-				r3 = c3.ReadAsync(TimeSpan.FromSeconds(2));
-				r4 = c4.ReadAsync(TimeSpan.FromSeconds(7));
+				r1 = c1.ReadAsync(TimeSpan.FromSeconds(7), token.Token);
+				r2 = c2.ReadAsync(TimeSpan.FromSeconds(3), token.Token);
+				r3 = c3.ReadAsync(TimeSpan.FromSeconds(2), token.Token);
+				r4 = c4.ReadAsync(TimeSpan.FromSeconds(7), token.Token);
 				try
 				{
 					var tasks = new List<Task> { r1, r2, r3, r4 };
@@ -216,6 +226,8 @@ namespace UnitTest
 				// Observe the exceptions on the other tasks
 				await ObservePotentialExceptions();
 			}
+
+			token.Dispose();
 		}
 
 		[TestMethod]
@@ -279,23 +291,26 @@ namespace UnitTest
 		{
 			var c = ChannelManager.CreateChannel<int>(buffersize: 1);
 			Task? w1 = null, w2 = null, w3 = null;
+			var token = new CancellationTokenSource();
 
 			async Task ObservePotentialExceptions()
 			{
+				token.Cancel();
 				// Observe the exceptions on the other tasks
-				// w1 is the buffered write,
-				//if (w1 != null) try { await w1; } catch { }
+				if (w1 != null) try { await w1; } catch { }
 				if (w2 != null) try { await w2; } catch { }
 				if (w3 != null) try { await w3; } catch { }
+				token.Dispose();
+				token = new CancellationTokenSource();
 			}
 
 			async Task p()
 			{
 				try
 				{
-					w1 = c.WriteAsync(4);
-					w2 = c.WriteAsync(5, TimeSpan.FromSeconds(1));
-					w3 = c.WriteAsync(6, TimeSpan.FromSeconds(2));
+					w1 = c.WriteAsync(4, token.Token);
+					w2 = c.WriteAsync(5, TimeSpan.FromSeconds(1), token.Token);
+					w3 = c.WriteAsync(6, TimeSpan.FromSeconds(2), token.Token);
 					var tasks = new List<Task> { w1, w2, w3 };
 
 					var t = await Task.WhenAny(tasks);
@@ -331,6 +346,7 @@ namespace UnitTest
 				await ObservePotentialExceptions();
 			}
 
+			token.Dispose();
 		}
 	}
 }
