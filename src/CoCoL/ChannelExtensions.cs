@@ -250,7 +250,32 @@ namespace CoCoL
 		/// <returns>True if the write succeeded, false otherwise</returns>
 		public static Task<bool> TryWriteAsync<T>(this IWriteChannel<T> self, T value, TimeSpan waittime, CancellationToken cancelToken)
 		{
-			return self.WriteAsync(value, new TimeoutOffer(waittime, cancelToken)).ContinueWith(x => x.IsCompleted && !x.IsFaulted && !x.IsCanceled);
+			return self.WriteAsync(value, new TimeoutOffer(waittime, cancelToken)).ContinueWith(x =>
+			{
+				if (x.IsFaulted || x.IsCanceled)
+				{
+					Exception ex = x.Exception;
+					if (ex is AggregateException aex && aex.InnerExceptions.Count == 1)
+						ex = aex.InnerExceptions[0];
+
+					// Check if it's the token that requested the cancellation
+					if (x.IsCanceled && cancelToken.IsCancellationRequested)
+						throw new TaskCanceledException();
+					// Otherwise, it's the timeout, which is caught by the null in the switch
+
+					return ex switch
+					{
+						// Consume timeout exceptions
+						TimeoutException _ => false,
+						// Exception is null, and the token hasn't requested the cancellation, so it must be from the two-phase commit when it captured the timeout.
+						null => false,
+						// Throw any remaining exceptions
+						_ => throw ex,
+					};
+				}
+
+				return x.IsCompleted;
+			});
 		}
 
 		/// <summary>
@@ -323,7 +348,26 @@ namespace CoCoL
 			return self.ReadAsync(new TimeoutOffer(timeout, cancelToken)).ContinueWith(x =>
 			{
 				if (x.IsFaulted || x.IsCanceled)
-					return new KeyValuePair<bool, T>(false, default(T));
+				{
+					Exception ex = x.Exception;
+					if (ex is AggregateException aex && aex.InnerExceptions.Count == 1)
+						ex = aex.InnerExceptions[0];
+
+					// Check if it's the token that requested the cancellation
+					if (x.IsCanceled)
+						throw new TaskCanceledException();
+					// Otherwise, it's the timeout, which is caught by the null in the switch
+
+					return ex switch
+					{
+						// Consume timeout exceptions
+						TimeoutException _ => new KeyValuePair<bool, T>(false, default),
+						// Exception is null so it must be canceled, and the token hasn't requested the cancellation, so it must be from the two-phase commit when it captured the timeout.
+						null => new KeyValuePair<bool, T>(false, default),
+						// Throw any remaining exceptions
+						_ => throw ex,
+					};
+				}
 
 				return new KeyValuePair<bool, T>(true, x.Result);
 			});
